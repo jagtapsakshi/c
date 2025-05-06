@@ -1,0 +1,101 @@
+//!nvcc --version
+
+
+//import torch
+//torch.cuda.is_available()
+
+
+//!pip install git+https://github.com/afnan47/cuda.git
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
+
+#define N 500
+
+__global__ void add(int *a, int *b, int *c) {
+    int tid = threadIdx.x;
+    if (tid < N) {
+        c[tid] = a[tid] + b[tid];
+    }
+}
+
+int main(void) {
+    int a[N], b[N], c[N];
+    int *dev_a, *dev_b, *dev_c;
+
+    cudaError_t err = cudaSuccess;
+
+    // Allocate memory on device
+    err = cudaMalloc((void**)&dev_a, N * sizeof(int));
+    if (err != cudaSuccess) {
+        printf("Failed to allocate dev_a on device: %s\n", cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    err = cudaMalloc((void**)&dev_b, N * sizeof(int));
+    if (err != cudaSuccess) {
+        printf("Failed to allocate dev_b on device: %s\n", cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    err = cudaMalloc((void**)&dev_c, N * sizeof(int));
+    if (err != cudaSuccess) {
+        printf("Failed to allocate dev_c on device: %s\n", cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    // Initialize input arrays
+    for (int i = 0; i < N; i++) {
+        a[i] = i;
+        b[i] = i * i;
+    }
+
+    // Create CUDA events for timing
+    cudaEvent_t start, end;
+    cudaEventCreate(&start);
+    cudaEventCreate(&end);
+    cudaEventRecord(start);
+
+    // Copy inputs to device
+    cudaMemcpy(dev_a, a, N * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(dev_b, b, N * sizeof(int), cudaMemcpyHostToDevice);
+
+    // Launch kernel
+    add<<<1, N>>>(dev_a, dev_b, dev_c);
+
+    // Copy result back to host
+    err = cudaMemcpy(c, dev_c, N * sizeof(int), cudaMemcpyDeviceToHost);
+    if (err != cudaSuccess) {
+        printf("Failed to copy dev_c to host: %s\n", cudaGetErrorString(err));
+        exit(EXIT_FAILURE);
+    }
+
+    // Measure and print elapsed time
+    cudaEventRecord(end);
+    cudaEventSynchronize(end);
+    float time = 0;
+    cudaEventElapsedTime(&time, start, end);
+
+    printf("Name: Chinmayee Bondgulwar BACO21157\n");
+    printf("Execution time = %f ms\n", time);
+
+    // Print a few sample results
+    for (int i = 0; i < 10; i++) {
+        printf("%d + %d = %d\n", a[i], b[i], c[i]);
+    }
+
+    // Free device memory
+    cudaFree(dev_a);
+    cudaFree(dev_b);
+    cudaFree(dev_c);
+
+    return 0;
+}
+
+
+!nvcc -o add_vectors add_vectors.cu
+
+!./add_vectors
+
