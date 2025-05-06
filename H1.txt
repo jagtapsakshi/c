@@ -1,0 +1,153 @@
+code = r"""
+#include <iostream>
+#include <omp.h>
+#include <vector>
+
+using namespace std;
+
+const int MAX = 1000;
+int graph[MAX][MAX], visited[MAX];
+
+void bfs_parallel(int start, int n) {
+    vector<int> frontier = {start};
+    visited[start] = 1;
+
+    while (!frontier.empty()) {
+        vector<int> next_frontier;
+
+        #pragma omp parallel
+        {
+            vector<int> local_next;
+
+            #pragma omp for nowait
+            for (int i = 0; i < frontier.size(); i++) {
+                int curr = frontier[i];
+                for (int j = 0; j < n; j++) {
+                    if (graph[curr][j]) {
+                        #pragma omp critical
+                        {
+                            if (!visited[j]) {
+                                visited[j] = 1;
+                                local_next.push_back(j);
+                            }
+                        }
+                    }
+                }
+            }
+
+            #pragma omp critical
+            next_frontier.insert(next_frontier.end(), local_next.begin(), local_next.end());
+        }
+
+        frontier = next_frontier;
+    }
+}
+
+int main() {
+    int n, start;
+   
+    cout << "Enter number of vertices: ";
+    cin >> n;
+
+    cout << "Enter adjacency matrix:\n";
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            cin >> graph[i][j];
+        }
+    }
+
+    cout << "Enter starting vertex (0-based index): ";
+    cin >> start;
+
+    bfs_parallel(start, n); 
+    cout << "BFS traversal: ";
+    for (int i = 0; i < n; i++) {
+        if (visited[i])
+            cout << i << " ";
+    }
+    cout << endl;
+
+    return 0;
+}
+
+"""
+
+with open("bfs_parallel.cpp", "w") as f:
+    f.write(code)
+
+
+
+//!g++ -fopenmp bfs_parallel.cpp -o bfs_parallel
+
+//!./bfs_parallel
+
+
+code = r"""
+#include <bits/stdc++.h>
+#include <omp.h> 
+using namespace std;
+
+const int MAX = 1000;
+int graph[MAX][MAX], visited[MAX];
+
+void dfs(int start, int n) {
+    stack<int> s;
+    s.push(start);
+
+    while (!s.empty()) {
+        int curr = s.top();
+        s.pop();
+
+        if (!visited[curr]) {
+            visited[curr] = 1;
+            for (int i = n - 1; i >= 0; i--) {
+                if (graph[curr][i] && !visited[i]) {
+                    s.push(i);
+                }
+            }
+        }
+    }
+}
+
+int main() {
+    int n, start;
+         
+        cout << endl;
+    cout << "Enter number of vertices: ";
+    cin >> n;
+
+    cout << "Enter adjacency matrix:\n";
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            cin >> graph[i][j];
+        }
+    }
+
+    cout << "Enter starting vertex: ";
+    cin >> start;
+
+    // Launching dfs in a parallel region
+    #pragma omp parallel
+    {
+        #pragma omp single
+        dfs(start, n);
+    }
+
+    cout << "DFS traversal: ";
+    for (int i = 0; i < n; i++) {
+        if (visited[i])
+            cout << i << " ";
+    }
+    cout << endl;
+
+    return 0;
+}
+"""
+
+with open("dfs_parallel.cpp", "w") as f:
+    f.write(code)
+
+//!g++ -fopenmp dfs_parallel.cpp -o dfs_parallel
+
+//!./dfs_parallel
+     

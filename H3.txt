@@ -1,0 +1,225 @@
+%%writefile omp_reduction.cpp
+#include <iostream>
+#include <vector>
+#include <omp.h>
+#include <climits>
+
+using namespace std;
+
+void min_reduction(vector<int>& arr) {
+  int min_value = INT_MAX;
+  #pragma omp parallel for reduction(min: min_value)
+  for (int i = 0; i < arr.size(); i++) {
+    if (arr[i] < min_value) {
+      min_value = arr[i];
+    }
+  }
+  cout << "Minimum value: " << min_value << endl;
+}
+
+void max_reduction(vector<int>& arr) {
+  int max_value = INT_MIN;
+  #pragma omp parallel for reduction(max: max_value)
+  for (int i = 0; i < arr.size(); i++) {
+    if (arr[i] > max_value) {
+      max_value = arr[i];
+    }
+  }
+  cout << "Maximum value: " << max_value << endl;
+}
+
+void sum_reduction(vector<int>& arr) {
+  int sum = 0;
+  #pragma omp parallel for reduction(+: sum)
+  for (int i = 0; i < arr.size(); i++) {
+    sum += arr[i];
+  }
+  cout << "Sum: " << sum << endl;
+}
+
+void average_reduction(vector<int>& arr) {
+  int sum = 0;
+  #pragma omp parallel for reduction(+: sum)
+  for (int i = 0; i < arr.size(); i++) {
+    sum += arr[i];
+  }
+  cout << "Average: " << (double)sum / arr.size() << endl;
+}
+
+int main() {
+  vector<int> arr = {5, 2, 9, 1, 7, 6, 8, 3, 4};
+  min_reduction(arr);
+  max_reduction(arr);
+  sum_reduction(arr);
+  average_reduction(arr);
+}
+
+
+
+//!g++ -fopenmp omp_reduction.cpp -o omp_reduction
+
+//!./omp_reduction
+
+
+
+%%writefile my_program.cpp
+#include <limits.h>
+#include <omp.h>
+#include <stdlib.h>
+
+#include <array>
+#include <chrono>
+#include <functional>
+#include <iostream>
+#include <string>
+#include <vector>
+
+using std::chrono::duration_cast;
+using std::chrono::high_resolution_clock;
+using std::chrono::milliseconds;
+using namespace std;
+
+void s_avg(int arr[], int n) {
+    long sum = 0L;
+    int i;
+    for (i = 0; i < n; i++) {
+        sum = sum + arr[i];
+    }
+    cout << sum / long(n);
+}
+
+void p_avg(int arr[], int n) {
+    long sum = 0L;
+    int i;
+    #pragma omp parallel for reduction(+ : sum) num_threads(16)
+    for (i = 0; i < n; i++) {
+        sum = sum + arr[i];
+    }
+    cout << sum / long(n);
+}
+
+void s_sum(int arr[], int n) {
+    long sum = 0L;
+    int i;
+    for (i = 0; i < n; i++) {
+        sum = sum + arr[i];
+    }
+    cout << sum;
+}
+
+void p_sum(int arr[], int n) {
+    long sum = 0L;
+    int i;
+    #pragma omp parallel for reduction(+ : sum) num_threads(16)
+    for (i = 0; i < n; i++) {
+        sum = sum + arr[i];
+    }
+    cout << sum;
+}
+
+void s_max(int arr[], int n) {
+    int max_val = INT_MIN;
+    int i;
+    for (i = 0; i < n; i++) {
+        if (arr[i] > max_val) {
+            max_val = arr[i];
+        }
+    }
+    cout << max_val;
+}
+
+void p_max(int arr[], int n) {
+    int max_val = INT_MIN;
+    int i;
+    #pragma omp parallel for reduction(max : max_val) num_threads(16)
+    for (i = 0; i < n; i++) {
+        if (arr[i] > max_val) {
+            max_val = arr[i];
+        }
+    }
+    cout << max_val;
+}
+
+void s_min(int arr[], int n) {
+    int min_val = INT_MAX;
+    int i;
+    for (i = 0; i < n; i++) {
+        if (arr[i] < min_val) {
+            min_val = arr[i];
+        }
+    }
+    cout << min_val;
+}
+
+void p_min(int arr[], int n) {
+    int min_val = INT_MAX;
+    int i;
+    #pragma omp parallel for reduction(min : min_val) num_threads(16)
+    for (i = 0; i < n; i++) {
+        if (arr[i] < min_val) {
+            min_val = arr[i];
+        }
+    }
+    cout << min_val;
+}
+
+std::string bench_traverse(std::function<void()> traverse_fn) {
+    auto start = high_resolution_clock::now();
+    traverse_fn();
+    cout << " (";
+    auto stop = high_resolution_clock::now();
+
+    // Subtract stop and start timepoints and cast it to required unit.
+    // Predefined units are nanoseconds, microseconds, milliseconds, seconds,
+    // minutes, hours. Use duration_cast() function.
+    auto duration = duration_cast<milliseconds>(stop - start);
+
+    // To get the value of duration use the count() member function on the
+    // duration object
+    return std::to_string(duration.count());
+}
+
+int main(int argc, const char **argv) {
+    if (argc < 3) {
+        std::cout << "Specify array length and maximum random value\n";
+        return 1;
+    }
+    int *a, n, rand_max;
+
+    n = stoi(argv[1]);
+    rand_max = stoi(argv[2]);
+    a = new int[n];
+
+    for (int i = 0; i < n; i++) {
+        a[i] = rand() % rand_max;
+    }
+
+    cout << "Generated random array of length " << n << " with elements between 0 to " << rand_max
+         << "\n\n";
+    cout << "Given array is \n";
+    for (int i = 0; i < n; i++) {
+        cout << a[i] << ", ";
+    }
+    cout << "\n\n";
+
+    omp_set_num_threads(16);
+
+    std::cout << "Sequential Min: " << bench_traverse([&] { s_min(a, n); }) << "ms)\n";
+    std::cout << "Parallel (16) Min: " << bench_traverse([&] { p_min(a, n); }) << "ms)\n\n";
+
+    std::cout << "Sequential Max: " << bench_traverse([&] { s_max(a, n); }) << "ms)\n";
+    std::cout << "Parallel (16) Max: " << bench_traverse([&] { p_max(a, n); }) << "ms)\n\n";
+
+    std::cout << "Sequential Sum: " << bench_traverse([&] { s_sum(a, n); }) << "ms)\n";
+    std::cout << "Parallel (16) Sum: " << bench_traverse([&] { p_sum(a, n); }) << "ms)\n\n";
+
+    std::cout << "Sequential Average: " << bench_traverse([&] { s_avg(a, n); }) << "ms)\n";
+    std::cout << "Parallel (16) Average: " << bench_traverse([&] { p_avg(a, n); }) << "ms)\n";
+    return 0;
+}
+
+
+
+//!g++ -fopenmp my_program.cpp -o my_program
+   
+//!./my_program 100000 10000
